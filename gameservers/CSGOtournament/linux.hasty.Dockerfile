@@ -1,6 +1,6 @@
 # escape=`
 
-FROM lacledeslan/gamesvr-csgo-tourney
+FROM head9x/csgo-tournament
 
 ARG BUILDNODE="unspecified"
 ARG SOURCE_COMMIT

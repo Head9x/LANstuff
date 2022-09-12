@@ -1,6 +1,6 @@
 # escape=`
 
-FROM lacledeslan/gamesvr-csgo
+FROM lltest/gamesvr-csgo
 
 HEALTHCHECK NONE
 

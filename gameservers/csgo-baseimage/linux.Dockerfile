@@ -2,7 +2,7 @@
 FROM lacledeslan/steamcmd:linux as csgo-builder
 
 ARG contentServer=content.lacledeslan.net
-ARG SKIP_STEAMCMD=false
+ARG SKIP_STEAMCMD=true
 
 # Copy in local cache files (if any)
 COPY --chown=SteamCMD:root ./.steamcmd/linux/output /output
