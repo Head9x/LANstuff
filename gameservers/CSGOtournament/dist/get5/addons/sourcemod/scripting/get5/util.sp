@@ -4,19 +4,20 @@
 #define MAX_FLOAT_STRING_LENGTH 32
 #define AUTH_LENGTH 64
 
-// Dummy value for when we need to write a keyvalue string, but we don't care about he value.
-// Trying to write an empty string often results in the keyvalue not being written, so we use this.
+// Dummy value for when we need to write a KeyValue string, but we don't care about the value *or*
+// when the value is an empty string. Trying to write an empty string results in the KeyValue not
+// being written, so we use this.
 #define KEYVALUE_STRING_PLACEHOLDER "__placeholder"
 
-static char _colorNames[][] = {"{NORMAL}", "{DARK_RED}",    "{PINK}",      "{GREEN}",
-                               "{YELLOW}", "{LIGHT_GREEN}", "{LIGHT_RED}", "{GRAY}",
-                               "{ORANGE}", "{LIGHT_BLUE}",  "{DARK_BLUE}", "{PURPLE}"};
-static char _colorCodes[][] = {"\x01", "\x02", "\x03", "\x04", "\x05", "\x06",
-                               "\x07", "\x08", "\x09", "\x0B", "\x0C", "\x0E"};
+static char _colorNames[][] = {"{NORMAL}",      "{DARK_RED}",  "{PINK}", "{GREEN}",  "{YELLOW}",
+                               "{LIGHT_GREEN}", "{LIGHT_RED}", "{GRAY}", "{ORANGE}", "{LIGHT_BLUE}",
+                               "{DARK_BLUE}",   "{PURPLE}",    "{GOLD}"};
+static char _colorCodes[][] = {"\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07",
+                               "\x08", "\x09", "\x0B", "\x0C", "\x0E", "\x10"};
 
 // Convenience macros.
-#define LOOP_TEAMS(%1) for (MatchTeam %1 = MatchTeam_Team1; %1 < MatchTeam_Count; %1 ++)
-#define LOOP_CLIENTS(%1) for (int %1 = 0; %1 <= MaxClients; %1 ++)
+#define LOOP_TEAMS(%1) for (Get5Team %1 = Get5Team_1; %1 < Get5Team_Count; %1 ++)
+#define LOOP_CLIENTS(%1) for (int %1 = 1; %1 <= MaxClients; %1 ++)
 
 // These match CS:GO's m_gamePhase values.
 enum GamePhase {
@@ -31,7 +32,7 @@ enum GamePhase {
  */
 stock int GetNumHumansOnTeam(int team) {
   int count = 0;
-  for (int i = 1; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (IsPlayer(i) && GetClientTeam(i) == team) {
       count++;
     }
@@ -41,7 +42,7 @@ stock int GetNumHumansOnTeam(int team) {
 
 stock int CountAlivePlayersOnTeam(int csTeam) {
   int count = 0;
-  for (int i = 1; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (IsPlayer(i) && IsPlayerAlive(i) && GetClientTeam(i) == csTeam) {
       count++;
     }
@@ -51,7 +52,7 @@ stock int CountAlivePlayersOnTeam(int csTeam) {
 
 stock int SumHealthOfTeam(int team) {
   int sum = 0;
-  for (int i = 1; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (IsPlayer(i) && IsPlayerAlive(i) && GetClientTeam(i) == team) {
       sum += GetClientHealth(i);
     }
@@ -59,21 +60,27 @@ stock int SumHealthOfTeam(int team) {
   return sum;
 }
 
-/**
- * Switches and respawns a player onto a new team.
- */
-stock void SwitchPlayerTeam(int client, int team) {
+stock int ConvertCSTeamToDefaultWinReason(int side) {
+  // This maps to
+  // https://github.com/VSES/SourceEngine2007/blob/master/se2007/game/shared/cstrike/cs_gamerules.h,
+  // which is the regular CSRoundEndReason + 1.
+  return view_as<int>(side == CS_TEAM_CT ? CSRoundEnd_CTWin : CSRoundEnd_TerroristWin) + 1;
+}
+
+stock void SwitchPlayerTeam(int client, Get5Side side, bool useDefaultTeamSelection = true) {
+  // Check avoids killing player if they're already on the right team.
+  int team = view_as<int>(side);
   if (GetClientTeam(client) == team) {
     return;
   }
-
-  LogDebug("SwitchPlayerTeam %L to %d", client, team);
-  if (team > CS_TEAM_SPECTATOR) {
+  if (useDefaultTeamSelection || team == CS_TEAM_SPECTATOR) {
+    ChangeClientTeam(client, team);
+  } else {
+    // When doing side-swap in knife-rounds, we do this to prevent the score from going -1 for
+    // everyone.
     CS_SwitchTeam(client, team);
     CS_UpdateClientModel(client);
     CS_RespawnPlayer(client);
-  } else {
-    ChangeClientTeam(client, team);
   }
 }
 
@@ -81,7 +88,7 @@ stock void SwitchPlayerTeam(int client, int team) {
  * Returns if a client is valid.
  */
 stock bool IsValidClient(int client) {
-  return client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client);
+  return client > 0 && client <= MaxClients && IsClientInGame(client);
 }
 
 stock bool IsPlayer(int client) {
@@ -97,7 +104,7 @@ stock bool IsAuthedPlayer(int client) {
  */
 stock int GetRealClientCount() {
   int clients = 0;
-  for (int i = 1; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (IsPlayer(i)) {
       clients++;
     }
@@ -108,10 +115,31 @@ stock int GetRealClientCount() {
 stock void Colorize(char[] msg, int size, bool stripColor = false) {
   for (int i = 0; i < sizeof(_colorNames); i++) {
     if (stripColor) {
-      ReplaceString(msg, size, _colorNames[i], "\x01");  // replace with white
+      ReplaceString(msg, size, _colorNames[i], "");  // replace with no color tag
     } else {
       ReplaceString(msg, size, _colorNames[i], _colorCodes[i]);
     }
+  }
+}
+
+stock void FormatChatCommand(char[] buffer, const int bufferLength, const char[] command) {
+  Format(buffer, bufferLength, "{GREEN}%s{NORMAL}", command);
+}
+
+stock void FormatCvarName(char[] buffer, const int bufferLength, const char[] cVar) {
+  Format(buffer, bufferLength, "{GRAY}%s{NORMAL}", cVar);
+}
+
+stock void FormatPlayerName(char[] buffer, const int bufferLength, const int client,
+                            const Get5Team team) {
+  // Used when injecting the team for coaching players, who are always on team spectator.
+  Get5Side side = view_as<Get5Side>(Get5_Get5TeamToCSTeam(team));
+  if (side == Get5Side_CT) {
+    Format(buffer, bufferLength, "{LIGHT_BLUE}%N{NORMAL}", client);
+  } else if (side == Get5Side_T) {
+    Format(buffer, bufferLength, "{GOLD}%N{NORMAL}", client);
+  } else {
+    Format(buffer, bufferLength, "{PURPLE}%N{NORMAL}", client);
   }
 }
 
@@ -122,43 +150,14 @@ stock void ReplaceStringWithInt(char[] buffer, int len, const char[] replace, in
   ReplaceString(buffer, len, replace, intString, caseSensitive);
 }
 
-stock bool IsTVEnabled() {
-  ConVar tvEnabledCvar = FindConVar("tv_enable");
-  if (tvEnabledCvar == null) {
-    LogError("Failed to get tv_enable cvar");
-    return false;
+stock void AnnouncePhaseChange(const char[] format, const char[] message) {
+  int count = g_PhaseAnnouncementCountCvar.IntValue;
+  if (count > 10) {
+    count = 10;
   }
-  return tvEnabledCvar.BoolValue;
-}
-
-stock int GetTvDelay() {
-  if (IsTVEnabled()) {
-    return GetCvarIntSafe("tv_delay");
+  for (int i = 0; i < count; i++) {
+    Get5_MessageToAll(format, message);
   }
-  return 0;
-}
-
-stock bool Record(const char[] demoName) {
-  char szDemoName[256];
-  strcopy(szDemoName, sizeof(szDemoName), demoName);
-  ReplaceString(szDemoName, sizeof(szDemoName), "\"", "\\\"");
-  ServerCommand("tv_record \"%s\"", szDemoName);
-
-  if (!IsTVEnabled()) {
-    LogError(
-        "Autorecording will not work with current cvar \"tv_enable\"=0. Set \"tv_enable 1\" in server.cfg (or another config file) to fix this.");
-    return false;
-  }
-
-  return true;
-}
-
-stock void StopRecording() {
-  ServerCommand("tv_stoprecord");
-  LogDebug("Calling Get5_OnDemoFinished(file=%s)", g_DemoFileName);
-  Call_StartForward(g_OnDemoFinished);
-  Call_PushString(g_DemoFileName);
-  Call_Finish();
 }
 
 stock bool InWarmup() {
@@ -173,25 +172,22 @@ stock bool InFreezeTime() {
   return GameRules_GetProp("m_bFreezePeriod") != 0;
 }
 
-stock void EnsurePausedWarmup() {
+stock void StartWarmup(int warmupTime = 0) {
+  ServerCommand("mp_do_warmup_period 1");
+  ServerCommand("mp_warmuptime_all_players_connected 0");
   if (!InWarmup()) {
-    StartWarmup();
+    ServerCommand("mp_warmup_start");
   }
-
-  ServerCommand("mp_warmup_pausetimer 1");
-  ServerCommand("mp_do_warmup_period 1");
-  ServerCommand("mp_warmup_pausetimer 1");
-}
-
-stock void StartWarmup(bool indefiniteWarmup = true, int warmupTime = 60) {
-  ServerCommand("mp_do_warmup_period 1");
-  ServerCommand("mp_warmuptime %d", warmupTime);
-  ServerCommand("mp_warmup_start");
-
-  // For some reason it needs to get sent twice. Ask Valve.
-  if (indefiniteWarmup) {
+  if (warmupTime < 1) {
+    LogDebug("Setting indefinite warmup.");
+    // Setting mp_warmuptime to anything less than 7 triggers the countdown to restart regardless of
+    // mp_warmup_pausetimer 1, and this might be tick-related, so we set it to 10 just for good
+    // measure.
+    ServerCommand("mp_warmuptime 10");
     ServerCommand("mp_warmup_pausetimer 1");
-    ServerCommand("mp_warmup_pausetimer 1");
+  } else {
+    ServerCommand("mp_warmuptime %d", warmupTime);
+    ServerCommand("mp_warmup_pausetimer 0");
   }
 }
 
@@ -199,8 +195,8 @@ stock void EndWarmup(int time = 0) {
   if (time == 0) {
     ServerCommand("mp_warmup_end");
   } else {
-    ServerCommand("mp_warmup_pausetimer 0");
     ServerCommand("mp_warmuptime %d", time);
+    ServerCommand("mp_warmup_pausetimer 0");
   }
 }
 
@@ -208,39 +204,8 @@ stock bool IsPaused() {
   return GameRules_GetProp("m_bMatchWaitingForResume") != 0;
 }
 
-// Pauses and returns if the match will automatically unpause after the duration ends.
-stock bool Pause(int pauseTime = 0, int csTeam = CS_TEAM_NONE) {
-  if (pauseTime == 0 || csTeam == CS_TEAM_SPECTATOR || csTeam == CS_TEAM_NONE) {
-    ServerCommand("mp_pause_match");
-    return false;
-  } else {
-    ServerCommand("mp_pause_match");
-    if (csTeam == CS_TEAM_T) {
-      GameRules_SetProp("m_bTerroristTimeOutActive", true);
-      GameRules_SetPropFloat("m_flTerroristTimeOutRemaining", float(pauseTime));
-    } else if (csTeam == CS_TEAM_CT) {
-      GameRules_SetProp("m_bCTTimeOutActive", true);
-      GameRules_SetPropFloat("m_flCTTimeOutRemaining", float(pauseTime));
-    }
-    return true;
-  }
-}
-
-stock void Unpause() {
-  ServerCommand("mp_unpause_match");
-}
-
-stock void RestartGame(int delay) {
+stock void RestartGame(int delay = 1) {
   ServerCommand("mp_restartgame %d", delay);
-}
-
-stock bool IsClientCoaching(int client) {
-  return GetClientTeam(client) == CS_TEAM_SPECTATOR &&
-         GetEntProp(client, Prop_Send, "m_iCoachingTeam") != 0;
-}
-
-stock void UpdateCoachTarget(int client, int csTeam) {
-  SetEntProp(client, Prop_Send, "m_iCoachingTeam", csTeam);
 }
 
 stock void SetTeamInfo(int csTeam, const char[] name, const char[] flag = "",
@@ -260,13 +225,17 @@ stock void SetTeamInfo(int csTeam, const char[] name, const char[] flag = "",
 
   // Add Ready/Not ready tags to team name if in warmup.
   char taggedName[MAX_CVAR_LENGTH];
-  if ((g_GameState == Get5State_Warmup || g_GameState == Get5State_PreVeto) &&
-      !g_DoingBackupRestoreNow) {
-    MatchTeam matchTeam = CSTeamToMatchTeam(csTeam);
-    if (IsTeamReady(matchTeam)) {
-      Format(taggedName, sizeof(taggedName), "%T %s", "ReadyTag", LANG_SERVER, name);
+  if (g_ReadyTeamTagCvar.BoolValue) {
+    if ((g_GameState == Get5State_Warmup || g_GameState == Get5State_PreVeto) &&
+        !g_DoingBackupRestoreNow) {
+      Get5Team matchTeam = CSTeamToGet5Team(csTeam);
+      if (IsTeamReady(matchTeam)) {
+        Format(taggedName, sizeof(taggedName), "%s %T", name, "ReadyTag", LANG_SERVER);
+      } else {
+        Format(taggedName, sizeof(taggedName), "%s %T", name, "NotReadyTag", LANG_SERVER);
+      }
     } else {
-      Format(taggedName, sizeof(taggedName), "%T %s", "NotReadyTag", LANG_SERVER, name);
+      strcopy(taggedName, sizeof(taggedName), name);
     }
   } else {
     strcopy(taggedName, sizeof(taggedName), name);
@@ -331,7 +300,8 @@ stock int GetCvarIntSafe(const char[] cvarName) {
   }
 }
 
-stock void FormatMapName(const char[] mapName, char[] buffer, int len, bool cleanName = false) {
+stock void FormatMapName(const char[] mapName, char[] buffer, int len, bool cleanName = false,
+                         bool color = false) {
   // explode map by '/' so we can remove any directory prefixes (e.g. workshop stuff)
   char buffers[4][PLATFORM_MAX_PATH];
   int numSplits = ExplodeString(mapName, "/", buffers, sizeof(buffers), PLATFORM_MAX_PATH);
@@ -360,7 +330,22 @@ stock void FormatMapName(const char[] mapName, char[] buffer, int len, bool clea
       strcopy(buffer, len, "Overpass");
     } else if (StrEqual(buffer, "de_nuke")) {
       strcopy(buffer, len, "Nuke");
+    } else if (StrEqual(buffer, "de_vertigo")) {
+      strcopy(buffer, len, "Vertigo");
+    } else if (StrEqual(buffer, "de_ancient")) {
+      strcopy(buffer, len, "Ancient");
+    } else if (StrEqual(buffer, "de_tuscan")) {
+      strcopy(buffer, len, "Tuscan");
+    } else if (StrEqual(buffer, "de_prime")) {
+      strcopy(buffer, len, "Prime");
+    } else if (StrEqual(buffer, "de_grind")) {
+      strcopy(buffer, len, "Grind");
+    } else if (StrEqual(buffer, "de_mocha")) {
+      strcopy(buffer, len, "Mocha");
     }
+  }
+  if (color) {
+    Format(buffer, len, "{GREEN}%s{NORMAL}", buffer);
   }
 }
 
@@ -402,28 +387,27 @@ stock int AddKeysToList(KeyValues kv, ArrayList list, int maxKeyLength) {
   return count;
 }
 
-stock int AddSubsectionAuthsToList(KeyValues kv, const char[] section, ArrayList list,
-                                   int maxKeyLength) {
+stock int AddSubsectionAuthsToList(KeyValues kv, const char[] section, ArrayList list) {
   int count = 0;
   if (kv.JumpToKey(section)) {
-    count = AddAuthsToList(kv, list, maxKeyLength);
+    count = AddAuthsToList(kv, list);
     kv.GoBack();
   }
   return count;
 }
 
-stock int AddAuthsToList(KeyValues kv, ArrayList list, int maxKeyLength) {
+stock int AddAuthsToList(KeyValues kv, ArrayList list) {
   int count = 0;
-  char[] buffer = new char[maxKeyLength];
+  char buffer[AUTH_LENGTH];
   char steam64[AUTH_LENGTH];
   char name[MAX_NAME_LENGTH];
   if (kv.GotoFirstSubKey(false)) {
     do {
-      kv.GetSectionName(buffer, maxKeyLength);
-      kv.GetString(NULL_STRING, name, sizeof(name));
+      kv.GetSectionName(buffer, AUTH_LENGTH);
+      ReadEmptyStringInsteadOfPlaceholder(kv, name, sizeof(name));
       if (ConvertAuthToSteam64(buffer, steam64)) {
         list.PushString(steam64);
-        Get5_SetPlayerName(steam64, name);
+        Get5_SetPlayerName(steam64, name, true);
         count++;
       }
     } while (kv.GotoNextKey(false));
@@ -441,6 +425,28 @@ stock bool RemoveStringFromArray(ArrayList list, const char[] str) {
   return false;
 }
 
+// Because KeyValue cannot write empty strings, we use this to consistently read empty strings and
+// replace our empty-string-placeholder with actual empty string.
+stock bool ReadEmptyStringInsteadOfPlaceholder(const KeyValues kv, char[] buffer,
+                                               const int bufferSize) {
+  kv.GetString(NULL_STRING, buffer, bufferSize);
+  if (StrEqual(KEYVALUE_STRING_PLACEHOLDER, buffer)) {
+    Format(buffer, bufferSize, "");
+    return true;
+  }
+  return false;
+}
+
+stock bool WritePlaceholderInsteadOfEmptyString(const KeyValues kv, char[] buffer,
+                                                const int bufferSize) {
+  kv.GetString(NULL_STRING, buffer, bufferSize);
+  if (StrEqual("", buffer)) {
+    kv.SetString(NULL_STRING, KEYVALUE_STRING_PLACEHOLDER);
+    return true;
+  }
+  return false;
+}
+
 stock int OtherCSTeam(int team) {
   if (team == CS_TEAM_CT) {
     return CS_TEAM_T;
@@ -451,25 +457,27 @@ stock int OtherCSTeam(int team) {
   }
 }
 
-stock MatchTeam OtherMatchTeam(MatchTeam team) {
-  if (team == MatchTeam_Team1) {
-    return MatchTeam_Team2;
-  } else if (team == MatchTeam_Team2) {
-    return MatchTeam_Team1;
+stock Get5Team OtherMatchTeam(Get5Team team) {
+  if (team == Get5Team_1) {
+    return Get5Team_2;
+  } else if (team == Get5Team_2) {
+    return Get5Team_1;
   } else {
     return team;
   }
 }
 
-stock bool IsPlayerTeam(MatchTeam team) {
-  return team == MatchTeam_Team1 || team == MatchTeam_Team2;
+stock bool IsPlayerTeam(Get5Team team) {
+  return team == Get5Team_1 || team == Get5Team_2;
 }
 
-public MatchTeam VetoFirstFromString(const char[] str) {
-  if (StrEqual(str, "team2", false)) {
-    return MatchTeam_Team2;
+stock Get5Team VetoFirstFromString(const char[] str) {
+  if (StrEqual(str, "random", false)) {
+    return view_as<Get5Team>(GetRandomInt(0, 1));
+  } else if (StrEqual(str, "team2", false)) {
+    return Get5Team_2;
   } else {
-    return MatchTeam_Team1;
+    return Get5Team_1;
   }
 }
 
@@ -487,7 +495,7 @@ stock bool GetAuth(int client, char[] auth, int size) {
 // TODO: might want a auth->client adt-trie to speed this up, maintained during
 // client auth and disconnect forwards.
 stock int AuthToClient(const char[] auth) {
-  for (int i = 1; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (IsAuthedPlayer(i)) {
       char clientAuth[AUTH_LENGTH];
       if (GetAuth(i, clientAuth, sizeof(clientAuth)) && StrEqual(auth, clientAuth)) {
@@ -498,11 +506,9 @@ stock int AuthToClient(const char[] auth) {
   return -1;
 }
 
-stock int MaxMapsToPlay(int mapsToWin) {
-  if (g_BO2Match)
-    return 2;
-  else
-    return 2 * mapsToWin - 1;
+stock int MapsToWin(int numberOfMaps) {
+  // This works because integers are rounded down; so 3 / 2 = 1.5, which becomes 1 as integer.
+  return (numberOfMaps / 2) + 1;
 }
 
 stock void CSTeamString(int csTeam, char[] buffer, int len) {
@@ -515,42 +521,19 @@ stock void CSTeamString(int csTeam, char[] buffer, int len) {
   }
 }
 
-stock void GetTeamString(MatchTeam team, char[] buffer, int len) {
-  if (team == MatchTeam_Team1) {
+stock void GetTeamString(Get5Team team, char[] buffer, int len) {
+  if (team == Get5Team_1) {
     Format(buffer, len, "team1");
-  } else if (team == MatchTeam_Team2) {
+  } else if (team == Get5Team_2) {
     Format(buffer, len, "team2");
-  } else if (team == MatchTeam_TeamSpec) {
+  } else if (team == Get5Team_Spec) {
     Format(buffer, len, "spec");
   } else {
     Format(buffer, len, "none");
   }
 }
 
-stock void GameStateString(Get5State state, char[] buffer, int length) {
-  switch (state) {
-    case Get5State_None:
-      Format(buffer, length, "none");
-    case Get5State_PreVeto:
-      Format(buffer, length, "waiting for map veto");
-    case Get5State_Veto:
-      Format(buffer, length, "map veto");
-    case Get5State_Warmup:
-      Format(buffer, length, "warmup");
-    case Get5State_KnifeRound:
-      Format(buffer, length, "knife round");
-    case Get5State_WaitingForKnifeRoundDecision:
-      Format(buffer, length, "waiting for knife round decision");
-    case Get5State_GoingLive:
-      Format(buffer, length, "going live");
-    case Get5State_Live:
-      Format(buffer, length, "live");
-    case Get5State_PostGame:
-      Format(buffer, length, "postgame");
-  }
-}
-
-public MatchSideType MatchSideTypeFromString(const char[] str) {
+stock MatchSideType MatchSideTypeFromString(const char[] str) {
   if (StrEqual(str, "normal", false) || StrEqual(str, "standard", false)) {
     return MatchSideType_Standard;
   } else if (StrEqual(str, "never_knife", false)) {
@@ -560,7 +543,7 @@ public MatchSideType MatchSideTypeFromString(const char[] str) {
   }
 }
 
-public void MatchSideTypeToString(MatchSideType type, char[] str, int len) {
+stock void MatchSideTypeToString(MatchSideType type, char[] str, int len) {
   if (type == MatchSideType_Standard) {
     Format(str, len, "standard");
   } else if (type == MatchSideType_NeverKnife) {
@@ -568,12 +551,6 @@ public void MatchSideTypeToString(MatchSideType type, char[] str, int len) {
   } else {
     Format(str, len, "always_knife");
   }
-}
-
-stock void ExecCfg(ConVar cvar) {
-  char cfg[PLATFORM_MAX_PATH];
-  cvar.GetString(cfg, sizeof(cfg));
-  ServerCommand("exec \"%s\"", cfg);
 }
 
 // Taken from Zephyrus (https://forums.alliedmods.net/showpost.php?p=2231850&postcount=2)
@@ -655,23 +632,15 @@ stock bool ConvertAuthToSteam64(const char[] inputId, char outputId[AUTH_LENGTH]
 }
 
 stock bool HelpfulAttack(int attacker, int victim) {
-  if (!IsValidClient(attacker) || !IsValidClient(victim)) {
-    return false;
-  }
-  int attackerTeam = GetClientTeam(attacker);
-  int victimTeam = GetClientTeam(victim);
-  return attackerTeam != victimTeam && attacker != victim;
+  // Assumes both attacker and victim are valid clients; check this before calling this function.
+  return attacker != victim && GetClientTeam(attacker) != GetClientTeam(victim);
 }
 
 stock SideChoice SideTypeFromString(const char[] input) {
-  if (StrEqual(input, "team1_ct", false)) {
+  if (StrEqual(input, "team1_ct", false) || StrEqual(input, "team2_t", false)) {
     return SideChoice_Team1CT;
-  } else if (StrEqual(input, "team1_t", false)) {
+  } else if (StrEqual(input, "team1_t", false) || StrEqual(input, "team2_ct", false)) {
     return SideChoice_Team1T;
-  } else if (StrEqual(input, "team2_ct", false)) {
-    return SideChoice_Team1T;
-  } else if (StrEqual(input, "team2_t", false)) {
-    return SideChoice_Team1CT;
   } else if (StrEqual(input, "knife", false)) {
     return SideChoice_KnifeRound;
   } else {
@@ -680,25 +649,9 @@ stock SideChoice SideTypeFromString(const char[] input) {
   }
 }
 
-typedef VoidFunction = function void();
-
-stock void DelayFunction(float delay, VoidFunction f) {
-  DataPack p = CreateDataPack();
-  p.WriteFunction(f);
-  CreateTimer(delay, _DelayFunctionCallback, p);
-}
-
-public Action _DelayFunctionCallback(Handle timer, DataPack data) {
-  data.Reset();
-  Function func = data.ReadFunction();
-  Call_StartFunction(INVALID_HANDLE, func);
-  Call_Finish();
-  delete data;
-}
-
 // Deletes a file if it exists. Returns true if the
 // file existed AND there was an error deleting it.
-public bool DeleteFileIfExists(const char[] path) {
+stock bool DeleteFileIfExists(const char[] path) {
   if (FileExists(path)) {
     if (!DeleteFile(path)) {
       LogError("Failed to delete file %s", path);
@@ -707,4 +660,59 @@ public bool DeleteFileIfExists(const char[] path) {
   }
 
   return true;
+}
+
+stock bool IsJSONPath(const char[] path) {
+  int length = strlen(path);
+  if (length >= 5) {
+    return strcmp(path[length - 5], ".json", false) == 0;
+  } else {
+    return false;
+  }
+}
+
+stock int GetMilliSecondsPassedSince(float timestamp) {
+  return RoundToFloor((GetEngineTime() - timestamp) * 1000);
+}
+
+stock int GetRoundsPlayed() {
+  return GameRules_GetProp("m_totalRoundsPlayed");
+}
+
+// Not entirely sure how this works, but it does work.
+// Also tested on Nuke with bombsites right on top of each other.
+stock Get5BombSite GetNearestBombsite(int client) {
+  int playerResource = GetPlayerResourceEntity();
+  if (playerResource == INVALID_ENT_REFERENCE) {
+    return Get5BombSite_Unknown;
+  }
+
+  float pos[3];
+  GetClientAbsOrigin(client, pos);
+
+  float aCenter[3], bCenter[3];
+  GetEntPropVector(playerResource, Prop_Send, "m_bombsiteCenterA", aCenter);
+  GetEntPropVector(playerResource, Prop_Send, "m_bombsiteCenterB", bCenter);
+
+  float aDist = GetVectorDistance(aCenter, pos, true);
+  float bDist = GetVectorDistance(bCenter, pos, true);
+
+  LogDebug("Bomb planted. Distance to A: %f. Distance to B: %f.", aDist, bDist);
+
+  return (aDist < bDist) ? Get5BombSite_A : Get5BombSite_B;
+}
+
+stock void convertSecondsToMinutesAndSeconds(int timeAsSeconds, char[] buffer,
+                                             const int bufferSize) {
+  int minutes = 0;
+  int seconds = timeAsSeconds;
+  if (timeAsSeconds >= 60) {
+    minutes = timeAsSeconds / 60;
+    seconds = timeAsSeconds % 60;
+  }
+  Format(buffer, bufferSize, seconds < 10 ? "%d:0%d" : "%d:%d", minutes, seconds);
+}
+
+stock bool IsDoingRestoreOrMapChange() {
+  return g_DoingBackupRestoreNow || g_WaitingForRoundBackup || g_MapChangePending;
 }

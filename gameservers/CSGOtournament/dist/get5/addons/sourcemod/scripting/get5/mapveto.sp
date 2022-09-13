@@ -4,70 +4,102 @@
 
 #define CONFIRM_NEGATIVE_VALUE "_"
 
-public void CreateVeto() {
+void CreateVeto() {
   if (g_MapPoolList.Length % 2 == 0) {
     LogError(
         "Warning, the maplist is even number sized (%d maps), vetos may not function correctly!",
         g_MapPoolList.Length);
   }
 
-  g_VetoCaptains[MatchTeam_Team1] = GetTeamCaptain(MatchTeam_Team1);
-  g_VetoCaptains[MatchTeam_Team2] = GetTeamCaptain(MatchTeam_Team2);
+  g_VetoCaptains[Get5Team_1] = GetTeamCaptain(Get5Team_1);
+  g_VetoCaptains[Get5Team_2] = GetTeamCaptain(Get5Team_2);
   ResetReadyStatus();
+  if (g_PauseOnVetoCvar.BoolValue) {
+    PauseGame(Get5Team_None, Get5PauseType_Admin);
+  }
   CreateTimer(1.0, Timer_VetoCountdown, _, TIMER_REPEAT);
 }
 
-public Action Timer_VetoCountdown(Handle timer) {
+static Action Timer_VetoCountdown(Handle timer) {
   static int warningsPrinted = 0;
+  if (g_GameState != Get5State_Veto) {
+    warningsPrinted = 0;
+    return Plugin_Stop;
+  }
   if (warningsPrinted >= g_VetoCountdownCvar.IntValue) {
     warningsPrinted = 0;
-    MatchTeam startingTeam = OtherMatchTeam(g_LastVetoTeam);
+    Get5Team startingTeam = OtherMatchTeam(g_LastVetoTeam);
     VetoController(g_VetoCaptains[startingTeam]);
     return Plugin_Stop;
   } else {
     warningsPrinted++;
     int secondsRemaining = g_VetoCountdownCvar.IntValue - warningsPrinted + 1;
-    Get5_MessageToAll("%t", "VetoCountdown", secondsRemaining);
+    char secondsFormatted[32];
+    Format(secondsFormatted, sizeof(secondsFormatted), "{GREEN}%d{NORMAL}", secondsRemaining);
+    Get5_MessageToAll("%t", "VetoCountdown", secondsFormatted);
     return Plugin_Continue;
   }
 }
 
 static void AbortVeto() {
   Get5_MessageToAll("%t", "CaptainLeftOnVetoInfoMessage");
-  Get5_MessageToAll("%t", "ReadyToResumeVetoInfoMessage");
+  char readyCommandFormatted[64];
+  FormatChatCommand(readyCommandFormatted, sizeof(readyCommandFormatted), "!ready");
+  Get5_MessageToAll("%t", "ReadyToResumeVetoInfoMessage", readyCommandFormatted);
   ChangeState(Get5State_PreVeto);
+  if (g_ActiveVetoMenu != null) {
+    g_ActiveVetoMenu.Cancel();
+  }
+  if (IsPaused()) {
+    UnpauseGame(Get5Team_None);
+  }
 }
 
-public void VetoFinished() {
+static void VetoFinished() {
   ChangeState(Get5State_Warmup);
   Get5_MessageToAll("%t", "MapDecidedInfoMessage");
 
-  // Use total series score as starting point, to not print skipped maps
-  int seriesScore = g_TeamSeriesScores[MatchTeam_Team1] + g_TeamSeriesScores[MatchTeam_Team2];
-  for (int i = seriesScore; i < g_MapsToPlay.Length; i++) {
-    char map[PLATFORM_MAX_PATH];
-    g_MapsToPlay.GetString(i, map, sizeof(map));
-    Get5_MessageToAll("%t", "MapIsInfoMessage", i + 1 - seriesScore, map);
+  if (IsPaused()) {
+    UnpauseGame(Get5Team_None);
   }
 
+  // If a team has a map advantage, don't print that map.
+  int mapNumber = Get5_GetMapNumber();
+  for (int i = mapNumber; i < g_MapsToPlay.Length; i++) {
+    char map[PLATFORM_MAX_PATH];
+    g_MapsToPlay.GetString(i, map, sizeof(map));
+    FormatMapName(map, map, sizeof(map), true, true);
+    Get5_MessageToAll("%t", "MapIsInfoMessage", i + 1 - mapNumber, map);
+  }
+
+  float delay = 10.0;
   g_MapChangePending = true;
-  CreateTimer(10.0, Timer_NextMatchMap);
+  if (!g_SkipVeto && g_DisplayGotvVetoCvar.BoolValue) {
+    // Players must wait for GOTV to end before we can change map, but we don't need to record that.
+    CreateTimer(float(GetTvDelay()) + delay, Timer_NextMatchMap);
+  } else {
+    CreateTimer(delay, Timer_NextMatchMap);
+  }
+  // Always end recording here; ensures that we can successfully start one after veto.
+  StopRecording(delay);
+  WriteBackup();  // Write first pre-live backup after veto.
 }
 
 // Main Veto Controller
 
-public void VetoController(int client) {
-  if (!IsPlayer(client) || GetClientMatchTeam(client) == MatchTeam_TeamSpec) {
+static void VetoController(int client) {
+  if (!IsPlayer(client) || GetClientMatchTeam(client) == Get5Team_Spec) {
     AbortVeto();
+    return;
   }
 
   int mapsLeft = g_MapsLeftInVetoPool.Length;
-  int maxMaps = MaxMapsToPlay(g_MapsToWin);
+  int maxMaps = g_NumberOfMapsInSeries;
 
   int mapsPicked = g_MapsToPlay.Length;
   int sidesSet = g_MapSides.Length;
 
-  int seriesScore = g_TeamSeriesScores[MatchTeam_Team1] + g_TeamSeriesScores[MatchTeam_Team2];
+  int seriesScore = g_TeamSeriesScores[Get5Team_1] + g_TeamSeriesScores[Get5Team_2];
 
   // This is a dirty hack to get ban/ban/pick/pick/ban/ban
   // instead of straight vetoing until the maplist is the length
@@ -90,7 +122,7 @@ public void VetoController(int client) {
   // The purpose is to force the veto process to take a
   // ban/ban/ban/ban/pick/pick/last map unused process for BO2's.
   bool bo2_hack = false;
-  if (g_BO2Match && (mapsLeft == 3 || mapsLeft == 2)) {
+  if (g_NumberOfMapsInSeries == 2 && (mapsLeft == 3 || mapsLeft == 2)) {
     bo2_hack = true;
   }
 
@@ -137,7 +169,7 @@ public void VetoController(int client) {
     VetoFinished();
 
   } else if (mapsLeft == 1) {
-    if (g_BO2Match) {
+    if (g_NumberOfMapsInSeries == 2) {
       // Terminate the veto since we've had ban-ban-ban-ban-pick-pick
       VetoFinished();
       return;
@@ -156,13 +188,16 @@ public void VetoController(int client) {
       g_MapSides.Push(SideChoice_Team1CT);
     }
 
-    EventLogger_MapPicked(MatchTeam_TeamNone, mapName, g_MapsToPlay.Length - 1);
+    Get5MapPickedEvent event =
+        new Get5MapPickedEvent(g_MatchID, Get5Team_None, mapName, g_MapsToPlay.Length - 1);
 
-    LogDebug("Calling Get5_OnMapPicked(team=%d, map=%s)", MatchTeam_TeamNone, mapName);
+    LogDebug("Calling Get5_OnMapPicked()");
+
     Call_StartForward(g_OnMapPicked);
-    Call_PushCell(MatchTeam_TeamNone);
-    Call_PushString(mapName);
+    Call_PushCell(event);
     Call_Finish();
+
+    EventLogger_LogAndDeleteEvent(event);
 
     VetoFinished();
   } else if (mapsLeft + mapsPicked <= maxMaps || bo3_hack || bo2_hack) {
@@ -174,8 +209,8 @@ public void VetoController(int client) {
 
 // Confirmations
 
-public void GiveConfirmationMenu(int client, MenuHandler handler, const char[] title,
-                          const char[] confirmChoice) {
+static void GiveConfirmationMenu(int client, MenuHandler handler, const char[] title,
+                                 const char[] confirmChoice) {
   // Figure out text for positive and negative values
   char positiveBuffer[1024], negativeBuffer[1024];
   Format(positiveBuffer, sizeof(positiveBuffer), "%T", "ConfirmPositiveOptionText", client);
@@ -232,7 +267,7 @@ static bool ConfirmationNegative(const char[] choice) {
 
 // Map Vetos
 
-public void GiveMapVetoMenu(int client) {
+static void GiveMapVetoMenu(int client) {
   Menu menu = new Menu(MapVetoMenuHandler);
   menu.SetTitle("%T", "MapVetoBanMenuText", client);
   menu.ExitButton = false;
@@ -252,10 +287,13 @@ public void GiveMapVetoMenu(int client) {
   SetConfirmationTime(true);
 }
 
-public int MapVetoMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
+static int MapVetoMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
   if (action == MenuAction_Select) {
+    if (g_GameState != Get5State_Veto) {
+      return;
+    }
     int client = param1;
-    MatchTeam team = GetClientMatchTeam(client);
+    Get5Team team = GetClientMatchTeam(client);
     char mapName[PLATFORM_MAX_PATH];
     menu.GetItem(param2, mapName, sizeof(mapName));
 
@@ -272,30 +310,40 @@ public int MapVetoMenuHandler(Menu menu, MenuAction action, int param1, int para
 
     RemoveStringFromArray(g_MapsLeftInVetoPool, mapName);
 
-    Get5_MessageToAll("%t", "TeamVetoedMapInfoMessage", g_FormattedTeamNames[team], mapName);
+    char formattedMapName[PLATFORM_MAX_PATH];
+    FormatMapName(mapName, formattedMapName, sizeof(formattedMapName), true, false);
+    // Add color here as FormatMapName would make the color green.
+    Format(formattedMapName, sizeof(formattedMapName), "{LIGHT_RED}%s{NORMAL}", formattedMapName);
+    Get5_MessageToAll("%t", "TeamVetoedMapInfoMessage", g_FormattedTeamNames[team],
+                      formattedMapName);
 
-    EventLogger_MapVetoed(team, mapName);
+    Get5MapVetoedEvent event = new Get5MapVetoedEvent(g_MatchID, team, mapName);
 
-    LogDebug("Calling Get5_OnMapVetoed(team=%d, map=%s)", team, mapName);
+    LogDebug("Calling Get5_OnMapVetoed()");
     Call_StartForward(g_OnMapVetoed);
-    Call_PushCell(team);
-    Call_PushString(mapName);
+    Call_PushCell(event);
     Call_Finish();
+
+    EventLogger_LogAndDeleteEvent(event);
 
     VetoController(GetNextTeamCaptain(client));
     g_LastVetoTeam = team;
 
   } else if (action == MenuAction_Cancel) {
-    AbortVeto();
-
+    if (g_GameState == Get5State_Veto) {
+      AbortVeto();
+    }
   } else if (action == MenuAction_End) {
+    if (menu == g_ActiveVetoMenu) {
+      g_ActiveVetoMenu = null;
+    }
     delete menu;
   }
 }
 
 // Map Picks
 
-public void GiveMapPickMenu(int client) {
+static void GiveMapPickMenu(int client) {
   Menu menu = new Menu(MapPickMenuHandler);
   menu.SetTitle("%T", "MapVetoPickMenuText", client);
   menu.ExitButton = false;
@@ -315,10 +363,13 @@ public void GiveMapPickMenu(int client) {
   SetConfirmationTime(true);
 }
 
-public int MapPickMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
+static int MapPickMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
   if (action == MenuAction_Select) {
+    if (g_GameState != Get5State_Veto) {
+      return;
+    }
     int client = param1;
-    MatchTeam team = GetClientMatchTeam(client);
+    Get5Team team = GetClientMatchTeam(client);
     char mapName[PLATFORM_MAX_PATH];
     menu.GetItem(param2, mapName, sizeof(mapName));
 
@@ -336,31 +387,40 @@ public int MapPickMenuHandler(Menu menu, MenuAction action, int param1, int para
     g_MapsToPlay.PushString(mapName);
     RemoveStringFromArray(g_MapsLeftInVetoPool, mapName);
 
-    Get5_MessageToAll("%t", "TeamPickedMapInfoMessage", g_FormattedTeamNames[team], mapName,
-                      g_MapsToPlay.Length);
+    char mapNameFormatted[PLATFORM_MAX_PATH];
+    FormatMapName(mapName, mapNameFormatted, sizeof(mapNameFormatted), true, true);
+    Get5_MessageToAll("%t", "TeamPickedMapInfoMessage", g_FormattedTeamNames[team],
+                      mapNameFormatted, g_MapsToPlay.Length);
     g_LastVetoTeam = team;
 
-    EventLogger_MapPicked(team, mapName, g_MapsToPlay.Length - 1);
+    Get5MapPickedEvent event =
+        new Get5MapPickedEvent(g_MatchID, team, mapName, g_MapsToPlay.Length - 1);
 
-    LogDebug("Calling Get5_OnMapPicked(team=%d, map=%s)", team, mapName);
+    LogDebug("Calling Get5_OnMapPicked()");
+
     Call_StartForward(g_OnMapPicked);
-    Call_PushCell(team);
-    Call_PushString(mapName);
+    Call_PushCell(event);
     Call_Finish();
+
+    EventLogger_LogAndDeleteEvent(event);
 
     VetoController(GetNextTeamCaptain(client));
 
   } else if (action == MenuAction_Cancel) {
-    AbortVeto();
-
+    if (g_GameState == Get5State_Veto) {
+      AbortVeto();
+    }
   } else if (action == MenuAction_End) {
+    if (menu == g_ActiveVetoMenu) {
+      g_ActiveVetoMenu = null;
+    }
     delete menu;
   }
 }
 
 // Side Picks
 
-public void GiveSidePickMenu(int client) {
+static void GiveSidePickMenu(int client) {
   Menu menu = new Menu(SidePickMenuHandler);
   menu.ExitButton = false;
   char mapName[PLATFORM_MAX_PATH];
@@ -373,10 +433,13 @@ public void GiveSidePickMenu(int client) {
   SetConfirmationTime(true);
 }
 
-public int SidePickMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
+static int SidePickMenuHandler(Menu menu, MenuAction action, int param1, int param2) {
   if (action == MenuAction_Select) {
+    if (g_GameState != Get5State_Veto) {
+      return;
+    }
     int client = param1;
-    MatchTeam team = GetClientMatchTeam(client);
+    Get5Team team = GetClientMatchTeam(client);
     char choice[PLATFORM_MAX_PATH];
     menu.GetItem(param2, choice, sizeof(choice));
 
@@ -394,39 +457,48 @@ public int SidePickMenuHandler(Menu menu, MenuAction action, int param1, int par
     int selectedSide;
     if (StrEqual(choice, "CT")) {
       selectedSide = CS_TEAM_CT;
-      if (team == MatchTeam_Team1)
+      if (team == Get5Team_1)
         g_MapSides.Push(SideChoice_Team1CT);
       else
         g_MapSides.Push(SideChoice_Team1T);
     } else {
       selectedSide = CS_TEAM_T;
-      if (team == MatchTeam_Team1)
+      if (team == Get5Team_1)
         g_MapSides.Push(SideChoice_Team1T);
       else
         g_MapSides.Push(SideChoice_Team1CT);
     }
 
-    char mapName[PLATFORM_MAX_PATH];
-    g_MapsToPlay.GetString(g_MapsToPlay.Length - 1, mapName, sizeof(mapName));
+    int mapNumber = g_MapsToPlay.Length - 1;
 
+    char mapName[PLATFORM_MAX_PATH];
+    g_MapsToPlay.GetString(mapNumber, mapName, sizeof(mapName));
+
+    Format(choice, sizeof(choice), "{GREEN}%s{NORMAL}", choice);
     Get5_MessageToAll("%t", "TeamSelectSideInfoMessage", g_FormattedTeamNames[team], choice,
                       mapName);
 
-    EventLogger_SidePicked(team, mapName, g_MapsToPlay.Length - 1, selectedSide);
+    Get5SidePickedEvent event = new Get5SidePickedEvent(g_MatchID, mapNumber, mapName, team,
+                                                        view_as<Get5Side>(selectedSide));
 
-    LogDebug("Calling Get5_OnSidePicked(team=%d, map=%s, side=%d)", team, mapName, selectedSide);
+    LogDebug("Calling Get5_OnSidePicked()");
+
     Call_StartForward(g_OnSidePicked);
-    Call_PushCell(team);
-    Call_PushString(mapName);
-    Call_PushCell(selectedSide);
+    Call_PushCell(event);
     Call_Finish();
+
+    EventLogger_LogAndDeleteEvent(event);
 
     VetoController(client);
 
   } else if (action == MenuAction_Cancel) {
-    AbortVeto();
-
+    if (g_GameState == Get5State_Veto) {
+      AbortVeto();
+    }
   } else if (action == MenuAction_End) {
+    if (menu == g_ActiveVetoMenu) {
+      g_ActiveVetoMenu = null;
+    }
     delete menu;
   }
 }

@@ -2,28 +2,37 @@
 {
     "ReadyToVetoInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when your team is ready to veto."
+        "#format"       "{1:s}"
+        "en"            "Type {1} when your team is ready to veto."
     }
     "WaitingForCastersReadyInfoMessage"
     {
-        "#format"       "{1:s}"
-        "en"            "Waiting for {1} to type {GREEN}!ready {NORMAL}to begin."
+        "#format"       "{1:s},{2:s}"
+        "en"            "Waiting for {1} to type {2} to begin."
     }
     "ReadyToRestoreBackupInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to restore the match backup."
+        "#format"       "{1:s}"
+        "en"            "Type {1} when you are ready to restore the match backup."
     }
     "ReadyToKnifeInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to knife."
+        "#format"       "{1:s}"
+        "en"            "Type {1} when you are ready to knife."
     }
     "ReadyToStartInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to begin."
+        "#format"       "{1:s}"
+        "en"            "Type {1} when you are ready to begin."
     }
     "YouAreReady"
     {
         "en"            "You have been marked as ready."
+    }
+    "YouAreReadyAuto"
+    {
+        "#format"       "{1:s}"
+        "en"            "NOTE: You have been marked as ready due to game activity. Type {1} if you are not ready."
     }
     "YouAreNotReady"
     {
@@ -31,8 +40,8 @@
     }
     "WaitingForEnemySwapInfoMessage"
     {
-        "#format"       "{1:s}"
-        "en"            "{1} won the knife round. Waiting for them to type !stay or !swap."
+        "#format"       "{1:s},{2:s},{3:s}"
+        "en"            "{1} won the knife round. Waiting for them to type {2} or {3}."
     }
     "WaitingForGOTVBrodcastEndingInfoMessage"
     {
@@ -40,13 +49,13 @@
     }
     "WaitingForGOTVVetoInfoMessage"
     {
-        "en"            "The map will change once the GOTV broadcast has been displayed the map vetos."
+        "en"            "The map will change once the GOTV broadcast has displayed the map vetos."
     }
     "NoMatchSetupInfoMessage"
     {
-        "en"			"There is no match setup"
+        "en"            "No match was set up"
     }
-    "YourAreNotAPlayerInfoMessage"
+    "YouAreNotAPlayerInfoMessage"
     {
         "en"            "You are not a player in this match"
     }
@@ -74,73 +83,124 @@
         "#format"       "{1:s}"
         "en"            "{1} has 10 seconds to ready up or forfeit the match."
     }
-    "PausePeriodSuffix"
-    {
-        "en"            "for this half"
-    }
     "MaxPausesUsedInfoMessage"
     {
         "#format"       "{1:d},{2:s}"
-        "en"            "Your team has already used the max {1} pauses{2}."
+        "en"            "{2} has used all their tactical pauses ({1})."
     }
     "MaxPausesTimeUsedInfoMessage"
     {
-        "#format"       "{1:d},{2:s}"
-        "en"            "Your team has already used the max {1} seconds of pause time{2}."
+        "#format"       "{1:s},{2:s}"
+        "en"            "{2} has used all their tactical pause time ({1})."
     }
     "MatchPausedByTeamMessage"
     {
-        "#format"       "{1:N}"
-        "en"            "{1} paused the match."
+        "#format"       "{1:s}"
+        "en"            "{1} has called for a tactical pause."
     }
     "MatchTechPausedByTeamMessage"
     {
-        "#format"       "{1:N}"
+        "#format"       "{1:s}"
         "en"            "{1} has called for a technical pause."
     }
-    "AdminForceTechPauseInfoMessage"
+    "PausesNotEnabled"
     {
-        "en"            "An admin has called for a technical pause."
+        "en"            "Pauses are not enabled."
     }
-    "PauseTimeExpiration10SecInfoMessage"
+    "TechPausesNotEnabled"
     {
-        "#format"       "{1:s}"
-        "en"            "{1} is almost out of pause time, unpausing in 10 seconds."
+        "en"            "Technical pauses are not enabled."
     }
-    "PauseTimeExpirationInfoMessage"
+    "TechnicalPauseMidSentence"
     {
-        "#format"       "{1:s},{2:d},{3:s}"
-        "en"            "{1} has {2} seconds of pause time left{3}."
+        "en"            "technical pause"
+    }
+    "TacticalPauseMidSentence"
+    {
+        "en"            "tactical pause"
+    }
+    "TimeRemainingBeforeAnyoneCanUnpausePrefix"
+    {
+        "en"            "Time remaining before anyone can unpause"
+    }
+    "PauseTimeRemainingPrefix"
+    {
+        "en"            "Remaining pause time"
+    }
+    "AwaitingUnpause"
+    {
+        "en"            "Awaiting unpause"
+    }
+    "PausedByAdministrator"
+    {
+        "en"            "An administrator has paused the match."
+    }
+    "PausedForBackup"
+    {
+        "en"            "The game was restored from a backup. Both teams must unpause to continue."
+    }
+    "UserCannotUnpauseAdmin"
+    {
+        "en"            "As an admin has called for this pause, it must also be unpaused by an admin."
+    }
+    "PausingTeamCannotUnpauseUntilFreezeTime"
+    {
+        "en"            "You cannot unpause before your pause has started. Pause requests cannot be canceled."
     }
     "PauseRunoutInfoMessage"
     {
         "#format"       "{1:s}"
-        "en"            "{1} has run out of pause time, unpausing the match."
+        "en"            "{1} has run out of pause time. Unpausing the match."
+    }
+    "TechPauseRunoutInfoMessage"
+    {
+        "#format"       "{1:s}"
+        "en"            "Maximum technical pause length has been reached. Anyone may {1} now."
+    }
+    "TechPauseNoTimeRemaining"
+    {
+        "#format"       "{1:s}"
+        "en"            "{1} has no more tech pause time. Please use tactical pauses."
+    }
+    "TechPauseNoPausesRemaining"
+    {
+        "#format"       "{1:s}"
+        "en"            "{1} has no more tech pauses. Please use tactical pauses."
+    }
+    "TechPausePausesRemaining"
+    {
+        "#format"       "{1:s},{2:d}"
+        "en"            "Technical pauses remaining for {1}: {2}"
     }
     "MatchUnpauseInfoMessage"
     {
-        "#format"       "{1:N}"
-        "en"            "{1:N} unpaused the match."
+        "#format"       "{1:s}"
+        "en"            "{1} unpaused the match."
     }
     "WaitingForUnpauseInfoMessage"
     {
-        "#format"       "{1:s},{2:s}"
-        "en"            "{1} wants to unpause, waiting for {2} to type !unpause."
+        "#format"       "{1:s},{2:s},{3:s}"
+        "en"            "{1} wants to unpause, waiting for {2} to type {3}."
     }
     "PausesLeftInfoMessage"
     {
-        "#format"       "{1:s},{2:d},{3:s}"
-        "en"            "{1} has {2} pauses left{3}."
+        "#format"       "{1:s},{2:d}"
+        "en"            "Tactical pauses remaining for {1}: {2}"
     }
-    "OnePauseLeftInfoMessage"
+    "PrereleaseVersionWarning"
     {
-        "#format"       "{1:s},{2:d},{3:s}"
-        "en"            "{1} has {2} pause left{3}."
+        "#format"       "{1:s},{2:s}"
+        "en"            "You are running an unofficial version of Get5 ({1}) intended for development and testing only. This message can be disabled with {2}."
+    }
+    "NewVersionAvailable"
+    {
+        "#format"       "{1:s}"
+        "en"            "A newer version of Get5 is available. Please visit {1} to update."
     }
     "TeamFailToReadyMinPlayerCheck"
     {
         "#format"       "{1:d}"
-        "en"            "You must have at least {1} players on the server to ready up."
+        "en"            "You must have at least {1} player(s) on the server to ready up."
     }
     "TeamReadyToVetoInfoMessage"
     {
@@ -169,13 +229,13 @@
     }
     "ForceReadyInfoMessage"
     {
-        "#format"       "{1:d}"
-        "en"            "You may type {GREEN}!forceready {NORMAL}to force ready your team if you have less than {GREEN}{1}{NORMAL} players."
+        "#format"       "{1:s},{2:s}"
+        "en"            "You may type {1} to force-ready your team if you have less than {2} players."
     }
     "TeammateForceReadied"
     {
-        "#format"       "{1:N}"
-        "en"            "Your team was force-readied by {GREEN}{1}"
+        "#format"       "{1:s}"
+        "en"            "Your team was force-readied by {1}."
     }
     "AdminForceReadyInfoMessage"
     {
@@ -183,35 +243,40 @@
     }
     "AdminForceEndInfoMessage"
     {
-        "en"            "An admin force ended the match."
+        "en"            "An admin force-ended the match."
     }
     "AdminForcePauseInfoMessage"
     {
-        "en"            "An admin force paused the match."
+        "en"            "An admin paused the match."
+    }
+    "AdminForceEndWithWinnerInfoMessage"
+    {
+        "#format"       "{1:s}"
+        "en"            "An admin force-ended the match, setting {1} as the winner."
     }
     "AdminForceUnPauseInfoMessage"
     {
-        "en"            "An admin force unpaused the match."
+        "en"            "An admin unpaused the match."
     }
-    "TeamWantsToReloadLastRoundInfoMessage"
+    "TeamWantsToReloadCurrentRound"
     {
-        "#format"       "{1:s},{2:s}"
-        "en"            "{1} wants to stop and reload last round, need {2} to confirm with !stop."
+        "#format"       "{1:s},{2:s},{3:s}"
+        "en"            "{1} wants to restore the game to the beginning of the current round. {2} must confirm with {3}."
     }
     "TeamWinningSeriesInfoMessage"
     {
         "#format"       "{1:s},{2:d},{3:d}"
-        "en"            "{1}{NORMAL} is winning the series {2}-{3}"
+        "en"            "{1} is winning the series {2}-{3}."
     }
     "SeriesTiedInfoMessage"
     {
         "#format"       "{1:d},{2:d}"
-        "en"            "The series is tied at {1}-{2}"
+        "en"            "The series is tied at {1}-{2}."
     }
     "NextSeriesMapInfoMessage"
     {
-        "#format"       "{1:s}"
-        "en"            "The next map in the series is {GREEN}{1}"
+        "#format"       "{1:s},{2:s}"
+        "en"            "The next map in the series is {1} and it will start in {2}."
     }
     "TeamWonMatchInfoMessage"
     {
@@ -223,11 +288,6 @@
         "#format"       "{1:s},{2:s}"
         "en"            "{1} and {2} have tied the match."
     }
-    "TeamsSplitSeriesBO2InfoMessage"
-    {
-        "#format"       "{1:s},{2:s}"
-        "en"            "{1} and {2} have split the series 1-1."
-    }
     "TeamWonSeriesInfoMessage"
     {
         "#format"       "{1:s},{2:d},{3:d}"
@@ -235,17 +295,21 @@
     }
     "MatchFinishedInfoMessage"
     {
-        "en"            "The match has been finished"
+        "en"            "The match is over"
     }
-    "CurrentScoreInfoMessage"
+    "StopCommandNotEnabled"
     {
-        "#format"       "{1:s},{2:d},{3:d},{4:s}"
-        "en"            "{LIGHT_GREEN}{1} {GREEN}{2} {NORMAL}- {GREEN}{3} {LIGHT_GREEN}{4}"
+        "en"            "The stop command is not enabled."
+    }
+    "StopCommandVotingReset"
+    {
+        "#format"       "{1:s}"
+        "en"            "The request by {1} to stop the game was canceled as the round ended."
     }
     "BackupLoadedInfoMessage"
     {
         "#format"       "{1:s}"
-        "en"            "Successfully loaded backup {1}"
+        "en"            "Successfully loaded backup {1}."
     }
     "MatchBeginInSecondsInfoMessage"
     {
@@ -282,7 +346,7 @@
     "ChangingMapInfoMessage"
     {
         "#format"       "{1:s}"
-        "en"            "Changing map to {GREEN}{1}..."
+        "en"            "Changing map to {1}..."
     }
     "MapDecidedInfoMessage"
     {
@@ -291,22 +355,22 @@
     "MapIsInfoMessage"
     {
         "#format"       "{1:d},{2:s}"
-        "en"            "Map {1}: {GREEN}{2}"
+        "en"            "Map {1}: {2}"
     }
     "TeamPickedMapInfoMessage"
     {
         "#format"       "{1:s},{2:s},{3:d}"
-        "en"            "{1} picked {GREEN}{2} {NORMAL}as map {3}"
+        "en"            "{1} picked {2} as map {3}."
     }
     "TeamSelectSideInfoMessage"
     {
         "#format"       "{1:s},{2:s},{3:s}"
-        "en"            "{1} has selected to start on {GREEN}{2} {NORMAL}on {3}"
+        "en"            "{1} has selected to start on {2} on {3}."
     }
     "TeamVetoedMapInfoMessage"
     {
         "#format"       "{1:s},{2:s}"
-        "en"            "{1} vetoed {LIGHT_RED}{2}"
+        "en"            "{1} vetoed {2}."
     }
     "CaptainLeftOnVetoInfoMessage"
     {
@@ -314,7 +378,8 @@
     }
     "ReadyToResumeVetoInfoMessage"
     {
-        "en"            "Type {GREEN}!ready {NORMAL}when you are ready to resume the veto."
+        "#format"       "{1:s}"
+        "en"            "Type {1} when you are ready to resume the veto."
     }
     "MatchConfigLoadedInfoMessage"
     {
@@ -322,7 +387,30 @@
     }
     "MoveToCoachInfoMessage"
     {
-        "en"            "Because your team is full, you were moved to the coach position."
+        "en"            "You were moved to the coach position as your team is full."
+    }
+    "CannotLeaveCoachingTeamIsFull"
+    {
+        "en"            "You cannot leave the coach position as your team is full."
+    }
+    "CoachingNotEnabled"
+    {
+        "#format"       "{1:s}"
+        "en"            "Coaching is not enabled. You must set {1} to 1."
+    }
+    "PlayerIsCoachingTeam"
+    {
+        "#format"       "{1:s},{2:s}"
+        "en"            "{1} is coaching {2}."
+    }
+    "CanOnlyCoachDuringWarmup"
+    {
+        "en"            "You can only change to or from coach during warmup."
+    }
+    "AllCoachSlotsFilledForTeam"
+    {
+        "#format"       "{1:d}"
+        "en"            "All coach slots ({1}) are currently filled for your team."
     }
     "ReadyTag"
     {
@@ -331,10 +419,6 @@
     "NotReadyTag"
     {
         "en"            "[NOT READY]"
-    }
-    "MatchPoweredBy"
-    {
-        "en"        "Powered by {YELLOW}Get5"
     }
     "MapVetoPickMenuText"
     {
@@ -357,7 +441,7 @@
     "MapVetoSidePickMenuText"
     {
         "#format"       "{1:s}"
-        "en"        "Select a side for {1}"
+        "en"        "Select a side for {1}:"
     }
     "MapVetoSidePickConfirmMenuText"
     {
@@ -374,7 +458,7 @@
     }
     "VetoCountdown"
     {
-        "#format"       "{1:i}"
-        "en"        "Veto commencing in {GREEN}{1} {NORMAL}seconds."
+        "#format"   "{1:s}"
+        "en"        "Veto commencing in {1} seconds."
     }
 }

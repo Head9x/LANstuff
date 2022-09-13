@@ -11,11 +11,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
   CreateNative("Get5_SetPlayerName", Native_SetPlayerName);
   CreateNative("Get5_RemovePlayerFromTeam", Native_RemovePlayerFromTeam);
   CreateNative("Get5_GetPlayerTeam", Native_GetPlayerTeam);
-  CreateNative("Get5_CSTeamToMatchTeam", Native_CSTeamToMatchTeam);
-  CreateNative("Get5_MatchTeamToCSTeam", Native_MatchTeamToCSTeam);
+  CreateNative("Get5_CSTeamToGet5Team", Native_CSTeamToGet5Team);
+  CreateNative("Get5_Get5TeamToCSTeam", Native_Get5TeamToCSTeam);
   CreateNative("Get5_GetTeamScores", Native_GetTeamScores);
   CreateNative("Get5_GetMatchID", Native_GetMatchID);
   CreateNative("Get5_SetMatchID", Native_SetMatchID);
+  CreateNative("Get5_GetServerID", Native_GetServerID);
+  CreateNative("Get5_GetMapNumber", Native_GetMapNumber);
   CreateNative("Get5_AddLiveCvar", Native_AddLiveCvar);
   CreateNative("Get5_IncreasePlayerStat", Native_IncreasePlayerStat);
   CreateNative("Get5_GetMatchStats", Native_GetMatchStats);
@@ -29,7 +31,7 @@ public int Native_GetGameState(Handle plugin, int numParams) {
 
 public int Native_Message(Handle plugin, int numParams) {
   int client = GetNativeCell(1);
-  if (client != 0 && (!IsClientConnected(client) || !IsClientInGame(client)))
+  if (client != 0 && !IsClientInGame(client))
     return;
 
   char buffer[1024];
@@ -47,23 +49,23 @@ public int Native_Message(Handle plugin, int numParams) {
     Format(finalMsg, sizeof(finalMsg), "%s %s", prefix, buffer);
 
   if (client == 0) {
-    Colorize(finalMsg, sizeof(finalMsg), false);
+    Colorize(finalMsg, sizeof(finalMsg), true);
     PrintToConsole(client, finalMsg);
-  } else if (IsClientInGame(client)) {
+  } else {
     Colorize(finalMsg, sizeof(finalMsg));
     PrintToChat(client, finalMsg);
   }
 }
 
 public int Native_MessageToTeam(Handle plugin, int numParams) {
-  MatchTeam team = view_as<MatchTeam>(GetNativeCell(1));
+  Get5Team team = view_as<Get5Team>(GetNativeCell(1));
   char prefix[64];
   g_MessagePrefixCvar.GetString(prefix, sizeof(prefix));
 
   char buffer[1024];
   int bytesWritten = 0;
 
-  for (int i = 0; i <= MaxClients; i++) {
+  LOOP_CLIENTS(i) {
     if (!IsPlayer(i) || GetClientMatchTeam(i) != team) {
       continue;
     }
@@ -88,9 +90,11 @@ public int Native_MessageToAll(Handle plugin, int numParams) {
   char buffer[1024];
   int bytesWritten = 0;
 
+  // Don't use LOOP_CLIENTS(i) because we need client 0 here.
   for (int i = 0; i <= MaxClients; i++) {
-    if (i != 0 && (!IsClientConnected(i) || !IsClientInGame(i)))
+    if (i != 0 && !IsClientInGame(i)) {
       continue;
+    }
 
     SetGlobalTransTarget(i);
     FormatNativeString(0, 1, 2, sizeof(buffer), bytesWritten, buffer);
@@ -101,12 +105,12 @@ public int Native_MessageToAll(Handle plugin, int numParams) {
     else
       Format(finalMsg, sizeof(finalMsg), "%s %s", prefix, buffer);
 
-    if (i != 0) {
+    if (i == 0) {
+      Colorize(finalMsg, sizeof(finalMsg), true);
+      PrintToConsole(i, finalMsg);
+    } else {
       Colorize(finalMsg, sizeof(finalMsg));
       PrintToChat(i, finalMsg);
-    } else {
-      Colorize(finalMsg, sizeof(finalMsg), false);
-      PrintToConsole(i, finalMsg);
     }
   }
 }
@@ -128,7 +132,7 @@ public int Native_LoadMatchConfigFromURL(Handle plugin, int numParams) {
 public int Native_AddPlayerToTeam(Handle plugin, int numParams) {
   char auth[AUTH_LENGTH];
   GetNativeString(1, auth, sizeof(auth));
-  MatchTeam team = view_as<MatchTeam>(GetNativeCell(2));
+  Get5Team team = view_as<Get5Team>(GetNativeCell(2));
   char name[MAX_NAME_LENGTH];
   if (numParams >= 3) {
     GetNativeString(3, name, sizeof(name));
@@ -141,11 +145,13 @@ public int Native_SetPlayerName(Handle plugin, int numParams) {
   char name[MAX_NAME_LENGTH];
   GetNativeString(1, auth, sizeof(auth));
   GetNativeString(2, name, sizeof(name));
+  bool suppressPlayerNameLoad = GetNativeCell(3);
   char steam64[AUTH_LENGTH];
-  ConvertAuthToSteam64(auth, steam64);
-  if (strlen(name) > 0 && !StrEqual(name, KEYVALUE_STRING_PLACEHOLDER)) {
+  if (strlen(name) > 0 && ConvertAuthToSteam64(auth, steam64)) {
     g_PlayerNames.SetString(steam64, name);
-    LoadPlayerNames();
+    if (!suppressPlayerNameLoad) {
+      LoadPlayerNames();
+    }
   }
 }
 
@@ -163,23 +169,23 @@ public int Native_GetPlayerTeam(Handle plugin, int numParams) {
   if (ConvertAuthToSteam64(auth, steam64Auth, false)) {
     return view_as<int>(GetAuthMatchTeam(steam64Auth));
   } else {
-    return view_as<int>(MatchTeam_TeamNone);
+    return view_as<int>(Get5Team_None);
   }
 }
 
-public int Native_CSTeamToMatchTeam(Handle plugin, int numParams) {
-  return view_as<int>(CSTeamToMatchTeam(GetNativeCell(1)));
+public int Native_CSTeamToGet5Team(Handle plugin, int numParams) {
+  return view_as<int>(CSTeamToGet5Team(GetNativeCell(1)));
 }
 
-public int Native_MatchTeamToCSTeam(Handle plugin, int numParams) {
-  return MatchTeamToCSTeam(GetNativeCell(1));
+public int Native_Get5TeamToCSTeam(Handle plugin, int numParams) {
+  return Get5TeamToCSTeam(GetNativeCell(1));
 }
 
 public int Native_GetTeamScores(Handle plugin, int numParams) {
-  MatchTeam team = GetNativeCell(1);
-  if (team == MatchTeam_Team1 || team == MatchTeam_Team2) {
+  Get5Team team = GetNativeCell(1);
+  if (team == Get5Team_1 || team == Get5Team_2) {
     SetNativeCellRef(2, g_TeamSeriesScores[team]);
-    SetNativeCellRef(3, CS_GetTeamScore(MatchTeamToCSTeam(team)));
+    SetNativeCellRef(3, CS_GetTeamScore(Get5TeamToCSTeam(team)));
   }
 }
 
@@ -190,7 +196,17 @@ public int Native_GetMatchID(Handle plugin, int numParams) {
 
 public int Native_SetMatchID(Handle plugin, int numParams) {
   GetNativeString(1, g_MatchID, sizeof(g_MatchID));
+  WriteBackup();
   return 0;
+}
+
+public int Native_GetServerID(Handle plugin, int numParams) {
+  return g_ServerIdCvar.IntValue;
+}
+
+public int Native_GetMapNumber(Handle plugin, int numParams) {
+  return g_TeamSeriesScores[Get5Team_1] + g_TeamSeriesScores[Get5Team_2] +
+         g_TeamSeriesScores[Get5Team_None];
 }
 
 public int Native_AddLiveCvar(Handle plugin, int numParams) {

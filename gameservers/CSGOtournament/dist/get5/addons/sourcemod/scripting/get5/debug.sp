@@ -1,7 +1,7 @@
 // TODO: Also try to write the original match config file.
 // Also consider the last K lines from the most recent errors_* file?
 
-public Action Command_DebugInfo(int client, int args) {
+Action Command_DebugInfo(int client, int args) {
   char path[PLATFORM_MAX_PATH + 1];
 
   if (args == 0 || !GetCmdArg(1, path, sizeof(path))) {
@@ -92,33 +92,46 @@ static void AddGlobalStateInfo(File f) {
   f.WriteLine("g_GameState = %d (%s)", g_GameState, buffer);
 
   f.WriteLine("g_MatchID = %s", g_MatchID);
+  f.WriteLine("g_RoundNumber = %d", g_RoundNumber);
   f.WriteLine("g_MapsToWin = %d", g_MapsToWin);
-  f.WriteLine("g_BO2Match = %d", g_BO2Match);
   f.WriteLine("g_LastVetoTeam = %d", g_LastVetoTeam);
   WriteArrayList(f, "g_MapPoolList", g_MapPoolList);
   WriteArrayList(f, "g_MapsToPlay", g_MapsToPlay);
   WriteArrayList(f, "g_MapsLeftInVetoPool", g_MapsLeftInVetoPool);
-  // TODO: write g_MapSides (it's not a string so WriteArrayList doesn't work).
-
+  f.WriteLine("Defined map sides:");
+  for (int i = 0; i < g_MapSides.Length; i++) {
+    SideChoice c = g_MapSides.Get(i);
+    if (c == SideChoice_Team1CT) {
+      f.WriteLine("g_MapSides(%d) = team1_ct", i);
+    } else if (c == SideChoice_Team1T) {
+      f.WriteLine("g_MapSides(%d) = team1_t", i);
+    } else {
+      f.WriteLine("g_MapSides(%d) = knife", i);
+    }
+  }
   f.WriteLine("g_MatchTitle = %s", g_MatchTitle);
   f.WriteLine("g_PlayersPerTeam = %d", g_PlayersPerTeam);
+  f.WriteLine("g_CoachesPerTeam = %d", g_CoachesPerTeam);
   f.WriteLine("g_MinPlayersToReady = %d", g_MinPlayersToReady);
   f.WriteLine("g_MinSpectatorsToReady = %d", g_MinSpectatorsToReady);
   f.WriteLine("g_SkipVeto = %d", g_SkipVeto);
   f.WriteLine("g_MatchSideType = %d", g_MatchSideType);
   f.WriteLine("g_InScrimMode = %d", g_InScrimMode);
+  f.WriteLine("g_SeriesCanClinch = %d", g_SeriesCanClinch);
   f.WriteLine("g_HasKnifeRoundStarted = %d", g_HasKnifeRoundStarted);
 
   f.WriteLine("g_MapChangePending = %d", g_MapChangePending);
   f.WriteLine("g_PendingSideSwap = %d", g_PendingSideSwap);
   f.WriteLine("g_WaitingForRoundBackup = %d", g_WaitingForRoundBackup);
-  f.WriteLine("g_SavedValveBackup = %d", g_SavedValveBackup);
   f.WriteLine("g_DoingBackupRestoreNow = %d", g_DoingBackupRestoreNow);
   f.WriteLine("g_ReadyTimeWaitingUsed = %d", g_ReadyTimeWaitingUsed);
+  f.WriteLine("g_PausingTeam = %d", g_PausingTeam);
+  f.WriteLine("g_PauseType = %d", g_PauseType);
+  f.WriteLine("g_LatestPauseDuration = %d", g_LatestPauseDuration);
 
   LOOP_TEAMS(team) {
     GetTeamString(team, buffer, sizeof(buffer));
-    f.WriteLine("Team info for team %s (%d):", buffer, team);
+    f.WriteLine("Team info for %s (%d):", buffer, team);
     f.WriteLine("g_TeamNames = %s", g_TeamNames[team]);
     WriteArrayList(f, "g_TeamAuths", g_TeamAuths[team]);
     f.WriteLine("g_TeamTags = %s", g_TeamTags[team]);
@@ -132,8 +145,11 @@ static void AddGlobalStateInfo(File f) {
     f.WriteLine("g_TeamSeriesScores = %d", g_TeamSeriesScores[team]);
     f.WriteLine("g_TeamReadyOverride = %d", g_TeamReadyOverride[team]);
     f.WriteLine("g_TeamStartingSide = %d", g_TeamStartingSide[team]);
-    f.WriteLine("g_TeamPauseTimeUsed = %d", g_TeamPauseTimeUsed[team]);
-    f.WriteLine("g_TeamPausesUsed = %d", g_TeamPausesUsed[team]);
+    f.WriteLine("g_TacticalPauseTimeUsed = %d", g_TacticalPauseTimeUsed[team]);
+    f.WriteLine("g_TacticalPausesUsed = %d", g_TacticalPausesUsed[team]);
+    f.WriteLine("g_TechnicalPausesUsed = %d", g_TechnicalPausesUsed[team]);
+    f.WriteLine("g_TeamGivenStopCommand = %d", g_TeamGivenStopCommand[team]);
+    WriteArrayList(f, "g_TeamCoaches", g_TeamCoaches[team]);
   }
 }
 
@@ -141,16 +157,23 @@ static void AddInterestingCvars(File f) {
   f.WriteLine("Interesting cvars:");
   WriteCvarString(f, "get5_allow_technical_pause");
   WriteCvarString(f, "get5_autoload_config");
+  WriteCvarString(f, "get5_auto_ready_active_players");
   WriteCvarString(f, "get5_check_auths");
   WriteCvarString(f, "get5_fixed_pause_time");
   WriteCvarString(f, "get5_kick_when_no_match_loaded");
   WriteCvarString(f, "get5_live_cfg");
+  WriteCvarString(f, "get5_tech_pause_time");
   WriteCvarString(f, "get5_max_pause_time");
   WriteCvarString(f, "get5_max_pauses");
-  WriteCvarString(f, "get5_mysql_force_matchid");
+  WriteCvarString(f, "get5_max_tech_pauses");
+  WriteCvarString(f, "get5_pause_on_veto");
   WriteCvarString(f, "get5_pausing_enabled");
+  WriteCvarString(f, "get5_print_damage");
+  WriteCvarString(f, "get5_print_damage_excess");
+  WriteCvarString(f, "get5_damageprint_format");
   WriteCvarString(f, "get5_reset_pauses_each_half");
   WriteCvarString(f, "get5_web_api_url");
+  WriteCvarString(f, "get5_last_backup_file");
   WriteCvarString(f, "mp_freezetime");
   WriteCvarString(f, "mp_halftime");
   WriteCvarString(f, "mp_halftime_duration");

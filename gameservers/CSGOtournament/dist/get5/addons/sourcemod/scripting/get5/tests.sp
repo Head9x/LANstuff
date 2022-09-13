@@ -1,9 +1,9 @@
-public Action Command_Test(int args) {
+Action Command_Test(int args) {
   Get5_Test();
   return Plugin_Handled;
 }
 
-public void Get5_Test() {
+static void Get5_Test() {
   if (g_GameState != Get5State_None) {
     g_GameState = Get5State_None;
   }
@@ -15,16 +15,21 @@ public void Get5_Test() {
   KV_Test();
 
   g_GameState = Get5State_None;
+  LogMessage("Tests complete!");
 }
 
 static void Utils_Test() {
   SetTestContext("Utils_Test");
 
-  // MaxMapsToPlay
-  AssertEq("MaxMapsToPlay1", MaxMapsToPlay(1), 1);
-  AssertEq("MaxMapsToPlay2", MaxMapsToPlay(2), 3);
-  AssertEq("MaxMapsToPlay3", MaxMapsToPlay(3), 5);
-  AssertEq("MaxMapsToPlay4", MaxMapsToPlay(4), 7);
+  // MapsToWin
+  AssertEq("MapsToWin1", MapsToWin(1), 1);
+  AssertEq("MapsToWin2", MapsToWin(2), 2);
+  AssertEq("MapsToWin3", MapsToWin(3), 2);
+  AssertEq("MapsToWin4", MapsToWin(4), 3);
+  AssertEq("MapsToWin5", MapsToWin(5), 3);
+  AssertEq("MapsToWin6", MapsToWin(6), 4);
+  AssertEq("MapsToWin7", MapsToWin(7), 4);
+  AssertEq("MapsToWin8", MapsToWin(8), 5);
 
   // ConvertAuthToSteam64
   char input[64] = "STEAM_0:1:52245092";
@@ -70,16 +75,16 @@ static void KV_Test() {
   SetTestContext("KV_Test");
 
   AssertEq("maps_to_win", g_MapsToWin, 2);
-  AssertEq("bo2_series", g_BO2Match, false);
+  AssertEq("num_maps", g_NumberOfMapsInSeries, 3);
   AssertEq("skip_veto", g_SkipVeto, false);
-  AssertEq("players_per_team", g_PlayersPerTeam, 1);
+  AssertEq("players_per_team", g_PlayersPerTeam, 5);
   AssertEq("favored_percentage_team1", g_FavoredTeamPercentage, 65);
 
-  AssertTrue("team1.name", StrEqual(g_TeamNames[MatchTeam_Team1], "EnvyUs", false));
-  AssertTrue("team1.flag", StrEqual(g_TeamFlags[MatchTeam_Team1], "FR", false));
-  AssertTrue("team1.logo", StrEqual(g_TeamLogos[MatchTeam_Team1], "nv", false));
+  AssertTrue("team1.name", StrEqual(g_TeamNames[Get5Team_1], "EnvyUs", false));
+  AssertTrue("team1.flag", StrEqual(g_TeamFlags[Get5Team_1], "FR", false));
+  AssertTrue("team1.logo", StrEqual(g_TeamLogos[Get5Team_1], "nv", false));
 
-  AssertTrue("team2.name", StrEqual(g_TeamNames[MatchTeam_Team2], "fnatic", false));
-  AssertTrue("team2.flag", StrEqual(g_TeamFlags[MatchTeam_Team2], "SE", false));
-  AssertTrue("team2.logo", StrEqual(g_TeamLogos[MatchTeam_Team2], "fntc", false));
+  AssertTrue("team2.name", StrEqual(g_TeamNames[Get5Team_2], "fnatic", false));
+  AssertTrue("team2.flag", StrEqual(g_TeamFlags[Get5Team_2], "SE", false));
+  AssertTrue("team2.logo", StrEqual(g_TeamLogos[Get5Team_2], "fntc", false));
 }
